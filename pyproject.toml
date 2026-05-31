@@ -1,0 +1,18 @@
+[project]
+name = "object-storage-benchmark"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "boto3>=1.43.18",
+    "numpy>=2.4.6",
+    "polars>=1.41.2",
+]
+
+[dependency-groups]
+dev = [
+    "boto3-stubs[s3]>=1.43.18",
+    "mypy>=2.1.0",
+    "pytest>=9.0.3",
+]
