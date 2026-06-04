@@ -1,0 +1,75 @@
+<mxfile host="Electron">
+  <diagram name="ページ-1" id="1NFhxaDLkaAfN2Qy8tGs">
+    <mxGraphModel dx="830" dy="1771" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" value="ワークロード情報の読み込み" vertex="1">
+          <mxGeometry height="40" width="160" x="200" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;単一のファイル条件の処理フロー&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px;&quot;&gt;ファイル条件一つに対して，複数のオブジェクトストレージで性能・機能を比較する&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="560" x="120" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" value="データ生成" vertex="1">
+          <mxGeometry height="40" width="160" x="200" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" value="バケット作成" vertex="1">
+          <mxGeometry height="40" width="160" x="280" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" value="measurement&lt;div&gt;・PUT x n_trials&lt;/div&gt;&lt;div&gt;・GET x n_trials&lt;/div&gt;&lt;div&gt;・DELETE x n_trials&lt;/div&gt;" vertex="1">
+          <mxGeometry height="80" width="160" x="280" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" value="オブジェクトストレージ設定" vertex="1">
+          <mxGeometry height="40" width="160" x="201" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-10" parent="1" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" value="&lt;div&gt;validation&lt;/div&gt;&lt;div&gt;・head&lt;/div&gt;&lt;div&gt;・tagging&lt;/div&gt;&lt;div&gt;・bucket policy&lt;/div&gt;&lt;div&gt;・ACL&lt;/div&gt;" vertex="1">
+          <mxGeometry height="80" width="160" x="280" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" value="結果の保存" vertex="1">
+          <mxGeometry height="40" width="160" x="280" y="640" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-21" parent="1" style="shape=table;startSize=0;container=1;collapsible=0;childLayout=tableLayout;fontSize=11;fillColor=none;strokeColor=none;" value="" vertex="1">
+          <mxGeometry height="60" width="180" x="370" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-22" parent="hvRrBhg7vK9Zuj_ziPDy-21" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;strokeColor=inherit;top=0;left=0;bottom=0;right=0;collapsible=0;dropTarget=0;fillColor=none;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=16;" value="" vertex="1">
+          <mxGeometry height="15" width="180" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-23" parent="hvRrBhg7vK9Zuj_ziPDy-22" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=none;top=0;left=0;bottom=0;right=0;pointerEvents=1;fontSize=12;align=left;spacingLeft=5;" value="name" vertex="1">
+          <mxGeometry height="15" width="180" as="geometry">
+            <mxRectangle height="15" width="180" as="alternateBounds" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-24" parent="hvRrBhg7vK9Zuj_ziPDy-21" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;strokeColor=inherit;top=0;left=0;bottom=0;right=0;collapsible=0;dropTarget=0;fillColor=none;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=16;" value="" vertex="1">
+          <mxGeometry height="15" width="180" y="15" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-25" parent="hvRrBhg7vK9Zuj_ziPDy-24" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=none;top=0;left=0;bottom=0;right=0;pointerEvents=1;fontSize=12;align=left;spacingLeft=5;" value="ファイルサイズ" vertex="1">
+          <mxGeometry height="15" width="180" as="geometry">
+            <mxRectangle height="15" width="180" as="alternateBounds" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-26" parent="hvRrBhg7vK9Zuj_ziPDy-21" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;strokeColor=inherit;top=0;left=0;bottom=0;right=0;collapsible=0;dropTarget=0;fillColor=none;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=16;" value="" vertex="1">
+          <mxGeometry height="15" width="180" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-27" parent="hvRrBhg7vK9Zuj_ziPDy-26" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=none;top=0;left=0;bottom=0;right=0;pointerEvents=1;fontSize=12;align=left;spacingLeft=5;" value="ファイル数" vertex="1">
+          <mxGeometry height="15" width="180" as="geometry">
+            <mxRectangle height="15" width="180" as="alternateBounds" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-28" parent="hvRrBhg7vK9Zuj_ziPDy-21" style="shape=tableRow;horizontal=0;startSize=0;swimlaneHead=0;swimlaneBody=0;strokeColor=inherit;top=0;left=0;bottom=0;right=0;collapsible=0;dropTarget=0;fillColor=none;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;fontSize=16;" vertex="1">
+          <mxGeometry height="15" width="180" y="45" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-29" parent="hvRrBhg7vK9Zuj_ziPDy-28" style="shape=partialRectangle;html=1;whiteSpace=wrap;connectable=0;strokeColor=inherit;overflow=hidden;fillColor=none;top=0;left=0;bottom=0;right=0;pointerEvents=1;fontSize=12;align=left;spacingLeft=5;" value="試行回数" vertex="1">
+          <mxGeometry height="15" width="180" as="geometry">
+            <mxRectangle height="15" width="180" as="alternateBounds" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-39" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" value="Podmanの起動" vertex="1">
+          <mxGeometry height="40" width="219" x="361" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="hvRrBhg7vK9Zuj_ziPDy-41" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="オブジェクトストレージをループで処理する．" vertex="1">
+          <mxGeometry height="30" width="309.5" x="400" y="200" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
