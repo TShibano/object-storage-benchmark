@@ -7,6 +7,7 @@ S3互換オブジェクトストレージ（MinIO・SeaweedFS・Garage）ベン�
 
 from __future__ import annotations
 
+import argparse
 import io
 import json
 import time
@@ -431,31 +432,47 @@ def benchmark_storage(
 # ── エントリーポイント ──────────────────────────────────────────────────────
 
 
+_ALL_STORAGE_CONFIGS = {
+    "minio": minio.get_config,
+    "seaweedfs": seaweedfs.get_config,
+    "garage": garage.get_config,
+}
+
+
 def main() -> None:
     """ベンチマークのエントリーポイント．
 
-    小ファイル・大ファイルの各ワークロードについて，MinIO・SeaweedFS・Garageを計測する．
+    --storage で指定したバックエンドについて，小ファイル・大ファイル両ワークロードを計測する．
     """
-    base_dir = Path("./trial1")
+    parser = argparse.ArgumentParser(description="S3互換オブジェクトストレージベンチマーク")
+    parser.add_argument(
+        "--storage",
+        choices=list(_ALL_STORAGE_CONFIGS),
+        required=True,
+        help="計測対象のストレージバックエンド",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=Path("./trial1"),
+        help="結果の出力先ディレクトリ (デフォルト: ./trial1)",
+    )
+    args = parser.parse_args()
+
+    storage_config = _ALL_STORAGE_CONFIGS[args.storage]()
     workload_configs = [
         WorkloadConfig(name="small", file_mb=1, n_file=1_000, n_trial=10),
         WorkloadConfig(name="large", file_mb=100, n_file=10, n_trial=10),
     ]
-    storage_configs = [
-        minio.get_config(),
-        seaweedfs.get_config(),
-        garage.get_config(),
-    ]
 
     for wl in workload_configs:
-        data_dir = base_dir / wl.name / "data"
+        data_dir = args.out_dir / wl.name / "data"
         # 既存データがあれば再生成しない（再実行時の時間節約）
         if not data_dir.exists():
             generate_parquet_file(output_dir=data_dir, n_file=wl.n_file, target_mb=wl.file_mb)
 
-        results_dir = base_dir / wl.name / "results"
-        for sc in storage_configs:
-            benchmark_storage(wl, sc, data_dir, results_dir)
+        results_dir = args.out_dir / wl.name / "results"
+        benchmark_storage(wl, storage_config, data_dir, results_dir)
 
 
 if __name__ == "__main__":

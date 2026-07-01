@@ -5,3 +5,5 @@ __pycache__/
 tmp/
 
 scripts/.garage_env
+
+results
