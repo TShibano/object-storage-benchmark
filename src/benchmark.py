@@ -7,85 +7,79 @@ S3互換オブジェクトストレージ（MinIO・SeaweedFS・Garage）ベン�
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
+import io
+import json
+import time
 from pathlib import Path
 
 import boto3
+import botocore.exceptions
+import polars as pl
 from mypy_boto3_s3 import S3Client
 
+import garage
+import minio
+import seaweedfs
 from generate_data import generate_parquet_file
+from models import FeatureResult, OperationResult, StorageConfig, WorkloadConfig
 
-# ── ワークロード定数 ────────────────────────────────────────────────────────
-
-
-@dataclass
-class WorkloadConfig:
-    """単一のワークロードの設定"""
-
-    name: str  # e.g. "small", "large"
-    file_mb: int  # ファイルサイズ[mb]
-    n_file: int  # ファイル数
-    n_trial: int  # 試行回数
-
-
-# ── データクラス ────────────────────────────────────────────────────────────
-
-
-@dataclass
-class StorageConfig:
-    """S3互換エンドポイントの接続設定．"""
-
-    name: str  # "minio" | "seaweedfs" | "garage"
-    endpoint_url: str
-    access_key: str
-    secret_key: str
-    bucket: str
-
-
-@dataclass
-class OperationResult:
-    """単一オペレーション（PUT/GET/DELETE）の計測値．"""
-
-    storage: str
-    operation: str  # "PUT" | "GET" | "DELETE"
-    workload: str  # e.g. "small" | "large"
-    trial: int
-    key: str
-    size_bytes: int
-    elapsed_ms: float
-    throughput_mbps: float
-
-
-@dataclass
-class FeatureResult:
-    """メタデータ操作（HEAD・タグ・ポリシー・ACL）の検証結果．"""
-
-    storage: str
-    feature: str  # "HEAD" | "TAGGING" | "BUCKET_POLICY" | "ACL"
-    supported: bool
-    error: str | None
-
-
-# ---- S3クライアント・バケット管理 --------
+# ── S3クライアント・バケット管理 ────────────────────────────────────────────
 
 
 def create_client(config: StorageConfig) -> S3Client:
-    """boto3 S3クライアントを生成する．"""
-    ...
+    """StorageConfig からS3クライアントを生成する．
+
+    Args:
+        config: 接続先ストレージの設定．
+
+    Returns:
+        boto3 S3クライアント．
+    """
+    return boto3.client(
+        "s3",
+        endpoint_url=config.endpoint_url,
+        aws_access_key_id=config.access_key,
+        aws_secret_access_key=config.secret_key,
+    )
 
 
 def setup_bucket(client: S3Client, bucket: str) -> None:
-    """バケットが存在しなければ作成する．"""
-    ...
+    """バケットが存在しない場合に作成する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+
+    Raises:
+        botocore.exceptions.ClientError: 404以外のエラーが発生した場合．
+    """
+    try:
+        client.head_bucket(Bucket=bucket)
+    except botocore.exceptions.ClientError as e:
+        if e.response["Error"]["Code"] in ("404", "NoSuchBucket"):
+            client.create_bucket(Bucket=bucket)
+        else:
+            raise
 
 
 def teardown_bucket(client: S3Client, bucket: str) -> None:
-    """バケット内オブジェクトを全削除しバケットを削除する．"""
-    ...
+    """バケット内の全オブジェクトを削除してバケットを削除する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+    """
+    paginator = client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=bucket):
+        objects = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
+        if objects:
+            client.delete_objects(Bucket=bucket, Delete={"Objects": objects})
+    client.delete_bucket(Bucket=bucket)
 
 
-# ---- 単一オペレーション計測 --------
+# ── 単一オペレーション計測 ──────────────────────────────────────────────────
+
+
 def measure_put(
     client: S3Client,
     bucket: str,
@@ -95,8 +89,26 @@ def measure_put(
     workload: str,
     trial: int,
 ) -> OperationResult:
-    """1回のPUTを計測して OperationResult を返す．"""
-    ...
+    """PUTオペレーションのレイテンシとスループットを計測する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+        key: オブジェクトキー．
+        data: アップロードするデータ．
+        storage: バックエンド識別子．
+        workload: ワークロード識別子．
+        trial: 試行番号．
+
+    Returns:
+        計測結果．
+    """
+    size_bytes = len(data)
+    start = time.perf_counter()
+    client.upload_fileobj(io.BytesIO(data), bucket, key)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    throughput_mbps = (size_bytes / 1024 / 1024) / (elapsed_ms / 1000)
+    return OperationResult(storage, "PUT", workload, trial, key, size_bytes, elapsed_ms, throughput_mbps)
 
 
 def measure_get(
@@ -108,8 +120,26 @@ def measure_get(
     workload: str,
     trial: int,
 ) -> OperationResult:
-    """1回のGETを計測して OperationResult を返す．"""
-    ...
+    """GETオペレーションのレイテンシとスループットを計測する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+        key: オブジェクトキー．
+        size_bytes: オブジェクトサイズ (bytes)．スループット算出に使用．
+        storage: バックエンド識別子．
+        workload: ワークロード識別子．
+        trial: 試行番号．
+
+    Returns:
+        計測結果．
+    """
+    start = time.perf_counter()
+    resp = client.get_object(Bucket=bucket, Key=key)
+    resp["Body"].read()
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    throughput_mbps = (size_bytes / 1024 / 1024) / (elapsed_ms / 1000)
+    return OperationResult(storage, "GET", workload, trial, key, size_bytes, elapsed_ms, throughput_mbps)
 
 
 def measure_delete(
@@ -121,26 +151,102 @@ def measure_delete(
     workload: str,
     trial: int,
 ) -> OperationResult:
-    """1回のDELETEを計測して OperationResult を返す．"""
-    ...
+    """DELETEオペレーションのレイテンシとスループットを計測する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+        key: オブジェクトキー．
+        size_bytes: オブジェクトサイズ (bytes)．スループット算出に使用．
+        storage: バックエンド識別子．
+        workload: ワークロード識別子．
+        trial: 試行番号．
+
+    Returns:
+        計測結果．
+    """
+    start = time.perf_counter()
+    client.delete_object(Bucket=bucket, Key=key)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    throughput_mbps = (size_bytes / 1024 / 1024) / (elapsed_ms / 1000)
+    return OperationResult(storage, "DELETE", workload, trial, key, size_bytes, elapsed_ms, throughput_mbps)
 
 
-def run_operation_measurement() -> list[OperationResult]:
-    """指定した回数， PUT/GET/DELETE の各処理を行う"""
-    ...
+def run_operation_measurement(
+    client: S3Client,
+    bucket: str,
+    workload: WorkloadConfig,
+    storage: str,
+    data_dir: Path,
+) -> list[OperationResult]:
+    """PUT・GET・DELETEを全ファイルに対して n_trial 回繰り返し計測する．
+
+    計測前に全ファイルをメモリへ読み込み，ローカルI/Oを計測から除外する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+        workload: ワークロードパラメータ．
+        storage: バックエンド識別子．
+        data_dir: Parquetファイルが格納されたディレクトリ．
+
+    Returns:
+        PUT・GET・DELETE各オペレーションの計測結果リスト．
+    """
+    # 計測ループ前にすべてメモリへ読み込み，ローカルI/Oを除外する
+    files = sorted(data_dir.glob("*.parquet"))[: workload.n_file]
+    file_data: list[tuple[int, bytes]] = [(i, p.read_bytes()) for i, p in enumerate(files)]
+
+    results: list[OperationResult] = []
+    for trial in range(workload.n_trial):
+        for i, data in file_data:
+            key = f"{workload.name}/{trial}/{i}.parquet"
+            results.append(measure_put(client, bucket, key, data, storage, workload.name, trial))
+
+        for i, data in file_data:
+            key = f"{workload.name}/{trial}/{i}.parquet"
+            results.append(measure_get(client, bucket, key, len(data), storage, workload.name, trial))
+
+        for i, data in file_data:
+            key = f"{workload.name}/{trial}/{i}.parquet"
+            results.append(measure_delete(client, bucket, key, len(data), storage, workload.name, trial))
+
+    return results
 
 
-# ---- 機能検証 --------
+# ── 機能検証 ────────────────────────────────────────────────────────────────
+
+_PROBE_KEY = "feature-probe.parquet"
+_PROBE_SIZE = 1024 * 1024  # 1 MB
 
 
 def validate_head(
     client: S3Client,
     bucket: str,
     key: str,
+    expected_size: int,
     storage: str,
 ) -> FeatureResult:
-    """HEADリクエストでオブジェクトメタデータ取得が可能か検証する．"""
-    ...
+    """HEADオペレーションの動作を検証する．
+
+    ContentLength と ContentType が正しく返ることを確認する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+        key: 検証対象オブジェクトキー．
+        expected_size: 期待するオブジェクトサイズ (bytes)．
+        storage: バックエンド識別子．
+
+    Returns:
+        機能検証結果．
+    """
+    try:
+        resp = client.head_object(Bucket=bucket, Key=key)
+        ok = resp.get("ContentLength") == expected_size and resp.get("ContentType") is not None
+        return FeatureResult(storage, "HEAD", ok, None)
+    except Exception as e:
+        return FeatureResult(storage, "HEAD", False, str(e))
 
 
 def validate_tagging(
@@ -149,8 +255,30 @@ def validate_tagging(
     key: str,
     storage: str,
 ) -> FeatureResult:
-    """オブジェクトタグの付与・取得が可能か検証する．"""
-    ...
+    """オブジェクトタグ付け機能を検証する．
+
+    タグのPUT後にGETして値が一致することを確認する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+        key: 検証対象オブジェクトキー．
+        storage: バックエンド識別子．
+
+    Returns:
+        機能検証結果．
+    """
+    try:
+        client.put_object_tagging(
+            Bucket=bucket,
+            Key=key,
+            Tagging={"TagSet": [{"Key": "env", "Value": "test"}]},
+        )
+        resp = client.get_object_tagging(Bucket=bucket, Key=key)
+        found = any(t["Key"] == "env" and t["Value"] == "test" for t in resp.get("TagSet", []))
+        return FeatureResult(storage, "TAGGING", found, None)
+    except Exception as e:
+        return FeatureResult(storage, "TAGGING", False, str(e))
 
 
 def validate_bucket_policy(
@@ -158,8 +286,37 @@ def validate_bucket_policy(
     bucket: str,
     storage: str,
 ) -> FeatureResult:
-    """バケットポリシーの設定・取得が可能か検証する．"""
-    ...
+    """バケットポリシーの設定・取得を検証する．
+
+    公開読み取りポリシーをPUTしてGETで内容が一致することを確認する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+        storage: バックエンド識別子．
+
+    Returns:
+        機能検証結果．
+    """
+    policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {"AWS": "*"},
+                "Action": "s3:GetObject",
+                "Resource": f"arn:aws:s3:::{bucket}/*",
+            }
+        ],
+    }
+    try:
+        client.put_bucket_policy(Bucket=bucket, Policy=json.dumps(policy))
+        resp = client.get_bucket_policy(Bucket=bucket)
+        got = json.loads(resp["Policy"])
+        ok = got["Statement"][0]["Effect"] == "Allow"
+        return FeatureResult(storage, "BUCKET_POLICY", ok, None)
+    except Exception as e:
+        return FeatureResult(storage, "BUCKET_POLICY", False, str(e))
 
 
 def validate_acl(
@@ -167,18 +324,57 @@ def validate_acl(
     bucket: str,
     storage: str,
 ) -> FeatureResult:
-    """バケットACLの設定・取得が可能か検証する．"""
-    ...
+    """バケットACLの設定・取得を検証する．
+
+    private ACLをPUTしてGETでOwner情報が返ることを確認する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+        storage: バックエンド識別子．
+
+    Returns:
+        機能検証結果．
+    """
+    try:
+        client.put_bucket_acl(Bucket=bucket, ACL="private")
+        resp = client.get_bucket_acl(Bucket=bucket)
+        owner = resp.get("Owner", {})
+        ok = bool(owner.get("DisplayName") or owner.get("ID"))
+        return FeatureResult(storage, "ACL", ok, None)
+    except Exception as e:
+        return FeatureResult(storage, "ACL", False, str(e))
 
 
 def run_feature_validation(
     client: S3Client,
-) -> None:
-    """全機能検証をまとめて実行し結果リストを返す．"""
-    ...
+    bucket: str,
+    storage: str,
+) -> list[FeatureResult]:
+    """全機能検証（HEAD・TAGGING・BUCKET_POLICY・ACL）を実行する．
+
+    プローブオブジェクトをアップロードして各検証を実行し，最後に削除する．
+
+    Args:
+        client: S3クライアント．
+        bucket: バケット名．
+        storage: バックエンド識別子．
+
+    Returns:
+        機能検証結果リスト．
+    """
+    client.put_object(Bucket=bucket, Key=_PROBE_KEY, Body=b"\x00" * _PROBE_SIZE)
+    results = [
+        validate_head(client, bucket, _PROBE_KEY, _PROBE_SIZE, storage),
+        validate_tagging(client, bucket, _PROBE_KEY, storage),
+        validate_bucket_policy(client, bucket, storage),
+        validate_acl(client, bucket, storage),
+    ]
+    client.delete_object(Bucket=bucket, Key=_PROBE_KEY)
+    return results
 
 
-# ---- 結果保存 --------
+# ── 結果保存 ────────────────────────────────────────────────────────────────
 
 
 def save_results(
@@ -186,75 +382,81 @@ def save_results(
     feat_results: list[FeatureResult],
     out_dir: Path,
 ) -> None:
-    """計測結果をCSVに保存する（op_results.csv・feature_results.csv）．"""
-    ...
+    """計測結果をCSVファイルへ書き出す．
+
+    Args:
+        op_results: オペレーション計測結果リスト．
+        feat_results: 機能検証結果リスト．
+        out_dir: 出力先ディレクトリ．存在しない場合は作成する．
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if op_results:
+        pl.DataFrame([vars(r) for r in op_results]).write_csv(out_dir / "op_results.csv")
+    if feat_results:
+        pl.DataFrame([vars(r) for r in feat_results]).write_csv(out_dir / "feature_results.csv")
 
 
-# ---- エントリーポイント ---------
+# ── ベンチマーク実行 ────────────────────────────────────────────────────────
 
 
 def benchmark_storage(
-    workload_config: WorkloadConfig, storage_config: StorageConfig, base_dir: Path
+    workload_config: WorkloadConfig,
+    storage_config: StorageConfig,
+    data_dir: Path,
+    results_dir: Path,
 ) -> None:
-    """1ストレージに対してワークロード・機能検証を実行し結果を保存する．"""
-    ...
+    """単一ストレージバックエンドに対してベンチマークを実行する．
+
+    バケットのセットアップ・計測・機能検証・結果保存・バケット削除を行う．
+
+    Args:
+        workload_config: ワークロードパラメータ．
+        storage_config: 対象ストレージの接続設定．
+        data_dir: テスト用Parquetファイルが格納されたディレクトリ．
+        results_dir: 結果CSVの出力先ディレクトリ．
+    """
+    client = create_client(storage_config)
+    bucket = storage_config.bucket
+    setup_bucket(client, bucket)
+    try:
+        op_results = run_operation_measurement(
+            client, bucket, workload_config, storage_config.name, data_dir
+        )
+        feat_results = run_feature_validation(client, bucket, storage_config.name)
+        save_results(op_results, feat_results, results_dir / storage_config.name)
+    finally:
+        teardown_bucket(client, bucket)
 
 
-# ----
+# ── エントリーポイント ──────────────────────────────────────────────────────
+
+
 def main() -> None:
-    """全ストレージのベンチマークをシーケンシャルに実行する．"""
-    # ベースディレクトリ
-    # この下に dataとresultsディレクトリを作成し，データと結果を格納する
+    """ベンチマークのエントリーポイント．
+
+    小ファイル・大ファイルの各ワークロードについて，MinIO・SeaweedFS・Garageを計測する．
+    """
     base_dir = Path("./trial1")
-    # ワークロードの設定
-    workload_config_list = [
+    workload_configs = [
         WorkloadConfig(name="small", file_mb=1, n_file=1_000, n_trial=10),
         WorkloadConfig(name="large", file_mb=100, n_file=10, n_trial=10),
     ]
-    # ベンチマーク対象ストレージの設定
-    storage_config_list: list[StorageConfig] = [
-        StorageConfig(
-            name="minio",
-            endpoint_url="http://localhost:9000",
-            access_key="minioadmin",
-            secret_key="minioadmin",
-            bucket="benchmark",
-        ),
-        StorageConfig(
-            name="seaweedfs",
-            endpoint_url="http://localhost:8333",
-            access_key="any",
-            secret_key="any",
-            bucket="benchmark",
-        ),
-        StorageConfig(
-            name="garage",
-            endpoint_url="http://localhost:3900",
-            access_key="",  # garage キーは起動後に取得
-            secret_key="",
-            bucket="benchmark",
-        ),
+    storage_configs = [
+        minio.get_config(),
+        seaweedfs.get_config(),
+        garage.get_config(),
     ]
-    # 各ワークロードに対し，指定したオブジェクトストレージに対する
-    # ワークロードの順番
-    # - データ生成
-    # - 各オブジェクトストレージに対して `benchmark_storage()` (ベンチマーク測定)
-    #     - オブジェクトストレージ起動
-    #     - バケット作成
-    #     - 測定(データ操作，機能検証)
-    for workload_config in workload_config_list:
-        # データ生成
-        output_dir: Path = base_dir / workload_config.name
-        os.makedirs(output_dir, exist_ok=True)
-        generate_parquet_file(
-            output_dir=output_dir,
-            n_file=workload_config.n_file,
-            target_mb=workload_config.file_mb,
-        )
-        # 各オブジェクトストレージに対して，ベンチマーク測定
-        for storage_config in storage_config_list:
-            benchmark_storage(
-                workload_config=workload_config,
-                storage_config=storage_config,
-                base_dir=base_dir / workload_config.name,
-            )
+
+    for wl in workload_configs:
+        data_dir = base_dir / wl.name / "data"
+        # 既存データがあれば再生成しない（再実行時の時間節約）
+        if not data_dir.exists():
+            generate_parquet_file(output_dir=data_dir, n_file=wl.n_file, target_mb=wl.file_mb)
+
+        results_dir = base_dir / wl.name / "results"
+        for sc in storage_configs:
+            benchmark_storage(wl, sc, data_dir, results_dir)
+
+
+if __name__ == "__main__":
+    main()
