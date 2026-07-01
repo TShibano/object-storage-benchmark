@@ -3,6 +3,10 @@
 set -euo pipefail
 
 CONTAINER_NAME="seaweedfs"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# 他のストレージコンテナを停止してディスクを解放する
+"$SCRIPT_DIR/stop_all.sh"
 
 if podman container exists "$CONTAINER_NAME" 2>/dev/null; then
     echo "既存コンテナ '$CONTAINER_NAME' を削除します"
@@ -19,7 +23,8 @@ podman run -d \
     -s3 \
     -s3.port=8333 \
     -filer \
-    -filer.port=8888
+    -filer.port=8888 \
+    -master.volumeSizeLimitMB=500
 
 echo "SeaweedFS 起動待機中..."
 until curl -sf "http://localhost:9333/cluster/status" > /dev/null 2>&1; do

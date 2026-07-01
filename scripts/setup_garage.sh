@@ -7,6 +7,9 @@ CONTAINER_NAME="garage"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.garage_env"
 
+# 他のストレージコンテナを停止してディスクを解放する
+"$SCRIPT_DIR/stop_all.sh"
+
 if podman container exists "$CONTAINER_NAME" 2>/dev/null; then
     echo "既存コンテナ '$CONTAINER_NAME' を削除します"
     podman rm -f "$CONTAINER_NAME"
@@ -25,8 +28,8 @@ until podman exec "$CONTAINER_NAME" /garage status > /dev/null 2>&1; do
     sleep 1
 done
 
-# シングルノードのレイアウトを設定
-NODE_ID=$(podman exec "$CONTAINER_NAME" /garage node id 2>/dev/null | awk '{print $1}')
+# シングルノードのレイアウトを設定（node id は <hash>@<addr> 形式なので hash 部分のみ抽出）
+NODE_ID=$(podman exec "$CONTAINER_NAME" /garage node id -q 2>/dev/null | awk -F@ '{print $1}')
 echo "ノードID: $NODE_ID"
 
 podman exec "$CONTAINER_NAME" /garage layout assign -z dc1 -c 10G "$NODE_ID"

@@ -3,6 +3,10 @@
 set -euo pipefail
 
 CONTAINER_NAME="minio"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# 他のストレージコンテナを停止してディスクを解放する
+"$SCRIPT_DIR/stop_all.sh"
 
 if podman container exists "$CONTAINER_NAME" 2>/dev/null; then
     echo "既存コンテナ '$CONTAINER_NAME' を削除します"
