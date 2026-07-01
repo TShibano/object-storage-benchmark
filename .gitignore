@@ -1,3 +1,7 @@
 .venv
+__pycache__/
+*.pyc
 # 仮データ置き場
 tmp/
+
+scripts/.garage_env
