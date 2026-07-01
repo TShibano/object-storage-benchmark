@@ -7,3 +7,5 @@ tmp/
 scripts/.garage_env
 
 results
+
+.DS_Store
