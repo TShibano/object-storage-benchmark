@@ -34,6 +34,7 @@ class StorageConfig:
         access_key: アクセスキー．
         secret_key: シークレットキー．
         bucket: 使用バケット名．
+        region: 署名に用いるリージョン．Garageは設定と一致させる必要がある．
     """
 
     name: str
@@ -41,6 +42,7 @@ class StorageConfig:
     access_key: str
     secret_key: str
     bucket: str
+    region: str = "us-east-1"
 
 
 @dataclass

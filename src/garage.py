@@ -26,4 +26,5 @@ def get_config() -> StorageConfig:
         access_key=os.environ["GARAGE_ACCESS_KEY"],
         secret_key=os.environ["GARAGE_SECRET_KEY"],
         bucket="benchmark",
+        region="garage",  # garage.toml の s3_region と一致させる
     )

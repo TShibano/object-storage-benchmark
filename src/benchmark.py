@@ -10,10 +10,12 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import sys
 import time
 from pathlib import Path
 
 import boto3
+import botocore.config
 import botocore.exceptions
 import polars as pl
 from mypy_boto3_s3 import S3Client
@@ -30,6 +32,11 @@ from models import FeatureResult, OperationResult, StorageConfig, WorkloadConfig
 def create_client(config: StorageConfig) -> S3Client:
     """StorageConfig からS3クライアントを生成する．
 
+    フレキシブルチェックサム（CRC32等）の計算・検証を無効化する．
+    S3互換ストレージはマルチパートアップロード時の合成チェックサム仕様が
+    AWS S3と異なり，boto3側の検証が不一致で失敗するため（Garageのlargeで顕在化）．
+    全バックエンドで同一設定とし，比較の公平性を保つ．
+
     Args:
         config: 接続先ストレージの設定．
 
@@ -41,6 +48,11 @@ def create_client(config: StorageConfig) -> S3Client:
         endpoint_url=config.endpoint_url,
         aws_access_key_id=config.access_key,
         aws_secret_access_key=config.secret_key,
+        region_name=config.region,
+        config=botocore.config.Config(
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ),
     )
 
 
@@ -64,7 +76,13 @@ def setup_bucket(client: S3Client, bucket: str) -> None:
 
 
 def teardown_bucket(client: S3Client, bucket: str) -> None:
-    """バケット内の全オブジェクトを削除してバケットを削除する．
+    """バケット内の全オブジェクトを削除し，バケットの削除を試みる．
+
+    オブジェクト削除（次バックエンドのための容量解放）を主目的とし，
+    空バケットの削除は後片付けとして扱う．Garageは事前作成したバケットを
+    S3 DeleteBucket で削除できない（グローバルエイリアス仕様）ため，
+    delete_bucket の失敗は警告のみで無視する．finally から呼ばれても
+    計測フェーズの例外を隠さないようにする狙いもある．
 
     Args:
         client: S3クライアント．
@@ -75,7 +93,10 @@ def teardown_bucket(client: S3Client, bucket: str) -> None:
         objects = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
         if objects:
             client.delete_objects(Bucket=bucket, Delete={"Objects": objects})
-    client.delete_bucket(Bucket=bucket)
+    try:
+        client.delete_bucket(Bucket=bucket)
+    except botocore.exceptions.ClientError as e:
+        print(f"警告: バケット '{bucket}' の削除をスキップしました: {e}", file=sys.stderr)
 
 
 # ── 単一オペレーション計測 ──────────────────────────────────────────────────
@@ -109,7 +130,9 @@ def measure_put(
     client.upload_fileobj(io.BytesIO(data), bucket, key)
     elapsed_ms = (time.perf_counter() - start) * 1000
     throughput_mbps = (size_bytes / 1024 / 1024) / (elapsed_ms / 1000)
-    return OperationResult(storage, "PUT", workload, trial, key, size_bytes, elapsed_ms, throughput_mbps)
+    return OperationResult(
+        storage, "PUT", workload, trial, key, size_bytes, elapsed_ms, throughput_mbps
+    )
 
 
 def measure_get(
@@ -140,7 +163,9 @@ def measure_get(
     resp["Body"].read()
     elapsed_ms = (time.perf_counter() - start) * 1000
     throughput_mbps = (size_bytes / 1024 / 1024) / (elapsed_ms / 1000)
-    return OperationResult(storage, "GET", workload, trial, key, size_bytes, elapsed_ms, throughput_mbps)
+    return OperationResult(
+        storage, "GET", workload, trial, key, size_bytes, elapsed_ms, throughput_mbps
+    )
 
 
 def measure_delete(
@@ -170,7 +195,9 @@ def measure_delete(
     client.delete_object(Bucket=bucket, Key=key)
     elapsed_ms = (time.perf_counter() - start) * 1000
     throughput_mbps = (size_bytes / 1024 / 1024) / (elapsed_ms / 1000)
-    return OperationResult(storage, "DELETE", workload, trial, key, size_bytes, elapsed_ms, throughput_mbps)
+    return OperationResult(
+        storage, "DELETE", workload, trial, key, size_bytes, elapsed_ms, throughput_mbps
+    )
 
 
 def run_operation_measurement(
@@ -196,21 +223,33 @@ def run_operation_measurement(
     """
     # 計測ループ前にすべてメモリへ読み込み，ローカルI/Oを除外する
     files = sorted(data_dir.glob("*.parquet"))[: workload.n_file]
-    file_data: list[tuple[int, bytes]] = [(i, p.read_bytes()) for i, p in enumerate(files)]
+    file_data: list[tuple[int, bytes]] = [
+        (i, p.read_bytes()) for i, p in enumerate(files)
+    ]
 
     results: list[OperationResult] = []
     for trial in range(workload.n_trial):
         for i, data in file_data:
             key = f"{workload.name}/{trial}/{i}.parquet"
-            results.append(measure_put(client, bucket, key, data, storage, workload.name, trial))
+            results.append(
+                measure_put(client, bucket, key, data, storage, workload.name, trial)
+            )
 
         for i, data in file_data:
             key = f"{workload.name}/{trial}/{i}.parquet"
-            results.append(measure_get(client, bucket, key, len(data), storage, workload.name, trial))
+            results.append(
+                measure_get(
+                    client, bucket, key, len(data), storage, workload.name, trial
+                )
+            )
 
         for i, data in file_data:
             key = f"{workload.name}/{trial}/{i}.parquet"
-            results.append(measure_delete(client, bucket, key, len(data), storage, workload.name, trial))
+            results.append(
+                measure_delete(
+                    client, bucket, key, len(data), storage, workload.name, trial
+                )
+            )
 
     return results
 
@@ -244,7 +283,10 @@ def validate_head(
     """
     try:
         resp = client.head_object(Bucket=bucket, Key=key)
-        ok = resp.get("ContentLength") == expected_size and resp.get("ContentType") is not None
+        ok = (
+            resp.get("ContentLength") == expected_size
+            and resp.get("ContentType") is not None
+        )
         return FeatureResult(storage, "HEAD", ok, None)
     except Exception as e:
         return FeatureResult(storage, "HEAD", False, str(e))
@@ -276,7 +318,9 @@ def validate_tagging(
             Tagging={"TagSet": [{"Key": "env", "Value": "test"}]},
         )
         resp = client.get_object_tagging(Bucket=bucket, Key=key)
-        found = any(t["Key"] == "env" and t["Value"] == "test" for t in resp.get("TagSet", []))
+        found = any(
+            t["Key"] == "env" and t["Value"] == "test" for t in resp.get("TagSet", [])
+        )
         return FeatureResult(storage, "TAGGING", found, None)
     except Exception as e:
         return FeatureResult(storage, "TAGGING", False, str(e))
@@ -392,9 +436,13 @@ def save_results(
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     if op_results:
-        pl.DataFrame([vars(r) for r in op_results]).write_csv(out_dir / "op_results.csv")
+        pl.DataFrame([vars(r) for r in op_results]).write_csv(
+            out_dir / "op_results.csv"
+        )
     if feat_results:
-        pl.DataFrame([vars(r) for r in feat_results]).write_csv(out_dir / "feature_results.csv")
+        pl.DataFrame([vars(r) for r in feat_results]).write_csv(
+            out_dir / "feature_results.csv"
+        )
 
 
 # ── ベンチマーク実行 ────────────────────────────────────────────────────────
@@ -444,7 +492,10 @@ def main() -> None:
 
     --storage で指定したバックエンドについて，小ファイル・大ファイル両ワークロードを計測する．
     """
-    parser = argparse.ArgumentParser(description="S3互換オブジェクトストレージベンチマーク")
+    print("Start Benchmark")
+    parser = argparse.ArgumentParser(
+        description="S3互換オブジェクトストレージベンチマーク"
+    )
     parser.add_argument(
         "--storage",
         choices=list(_ALL_STORAGE_CONFIGS),
@@ -454,7 +505,7 @@ def main() -> None:
     parser.add_argument(
         "--out-dir",
         type=Path,
-        default=Path("./trial1"),
+        default=Path("./results/trial1"),
         help="結果の出力先ディレクトリ (デフォルト: ./trial1)",
     )
     args = parser.parse_args()
@@ -464,12 +515,15 @@ def main() -> None:
         WorkloadConfig(name="small", file_mb=1, n_file=1_000, n_trial=10),
         WorkloadConfig(name="large", file_mb=100, n_file=10, n_trial=10),
     ]
+    print(f"ベンチマーク設定: {workload_configs}")
 
     for wl in workload_configs:
         data_dir = args.out_dir / wl.name / "data"
         # 既存データがあれば再生成しない（再実行時の時間節約）
         if not data_dir.exists():
-            generate_parquet_file(output_dir=data_dir, n_file=wl.n_file, target_mb=wl.file_mb)
+            generate_parquet_file(
+                output_dir=data_dir, n_file=wl.n_file, target_mb=wl.file_mb
+            )
 
         results_dir = args.out_dir / wl.name / "results"
         benchmark_storage(wl, storage_config, data_dir, results_dir)
