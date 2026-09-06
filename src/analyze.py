@@ -8,6 +8,7 @@ Abstract:
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 from typing import Any, Final
 
@@ -22,14 +23,14 @@ import polars as pl
 
 # ── 定数 ────────────────────────────────────────────────────────────────────
 
-# 計測結果は results/trial1/{workload}/results/{storage}/op_results.csv に格納．
-# results/ は .gitignore 対象のため読み取り専用として扱い，このスクリプトからは
+# 計測結果は {results-dir}/{workload}/results/{storage}/op_results.csv，
+# 機能検証結果は {results-dir}/{workload}/results/{storage}/feature_results.csv
+# に格納．results/ は .gitignore 対象のため読み取り専用として扱い，このスクリプトからは
 # 一切書き込まない．
-_TRIAL1_DIR: Final[Path] = Path("results/trial1")
-
-# 機能検証結果はStep 2で判定バグを修正して取り直した最新版を正とする．
-# results/trial1/*/results/*/feature_results.csv は旧版（判定バグ含む）のため使わない．
-_FEATURES_DIR: Final[Path] = Path("results/features_recheck")
+# results/trial1 はコンテナイメージのタグ未固定で計測したため，性能データと機能検証
+# データのバージョンが揃っていない．results/trial2 はタグを固定して両方を揃えて
+# 取り直した版のため，これ以降はデフォルトとして正とする．
+_DEFAULT_RESULTS_DIR: Final[Path] = Path("results/trial2")
 
 _OUTPUT_DIR: Final[Path] = Path("docs/figures")
 
@@ -115,8 +116,12 @@ def _lighten(hex_color: str, amount: float) -> str:
 # ── データ読み込み ────────────────────────────────────────────────────────
 
 
-def load_op_results() -> pl.DataFrame:
+def load_op_results(results_dir: Path) -> pl.DataFrame:
     """全ワークロード・全ストレージのオペレーション計測結果を読み込む．
+
+    Args:
+        results_dir: 計測結果一式が格納されたディレクトリ
+            （`{results_dir}/{workload}/results/{storage}/op_results.csv`）．
 
     Returns:
         `storage,operation,workload,trial,key,size_bytes,elapsed_ms,
@@ -124,7 +129,7 @@ def load_op_results() -> pl.DataFrame:
     """
     frames = [
         pl.read_csv(
-            _TRIAL1_DIR / workload / "results" / storage / "op_results.csv",
+            results_dir / workload / "results" / storage / "op_results.csv",
             schema_overrides=_OP_RESULTS_SCHEMA,
         )
         for workload in _WORKLOADS
@@ -133,20 +138,48 @@ def load_op_results() -> pl.DataFrame:
     return pl.concat(frames)
 
 
-def load_feature_results() -> pl.DataFrame:
-    """機能検証結果（Step 2で判定バグ修正済みの最新版）を読み込む．
+def load_feature_results(results_dir: Path) -> pl.DataFrame:
+    """全ワークロード・全ストレージの機能検証結果を読み込む．
+
+    機能検証は専用の検証キー（`feature-probe.parquet`）1個に対して行われ，
+    ワークロード（small／large）には依存しないため，本来は同一ストレージなら
+    どちらのワークロードで読んでも同じ結果になるはずである．念のため両方を
+    読み込んで統合し，ワークロード間で `supported` が食い違っていないか検証する．
+
+    Args:
+        results_dir: 計測結果一式が格納されたディレクトリ
+            （`{results_dir}/{workload}/results/{storage}/feature_results.csv`）．
 
     Returns:
-        `storage,feature,supported,error` 列を持つ結合済みDataFrame．
+        `storage,feature,supported,error` 列を持つ，ストレージ・機能ごとに
+        1行へ統合されたDataFrame．
+
+    Raises:
+        ValueError: 同じストレージ・機能でワークロード間の `supported` が
+            食い違う場合（機能検証がワークロードに依存してしまっている異常事態）．
     """
     frames = [
         pl.read_csv(
-            _FEATURES_DIR / storage / "feature_results.csv",
+            results_dir / workload / "results" / storage / "feature_results.csv",
             schema_overrides=_FEATURE_RESULTS_SCHEMA,
         )
+        for workload in _WORKLOADS
         for storage in _STORAGES
     ]
-    return pl.concat(frames)
+    combined = pl.concat(frames)
+
+    inconsistent = combined.group_by(["storage", "feature"]).agg(
+        pl.col("supported").n_unique().alias("n_unique")
+    )
+    if bool((inconsistent["n_unique"] > 1).any()):
+        raise ValueError(
+            "ワークロード間で機能検証結果(supported)が食い違っています: "
+            f"{inconsistent.filter(pl.col('n_unique') > 1).to_dicts()}"
+        )
+
+    return combined.unique(subset=["storage", "feature"], keep="first").sort(
+        ["storage", "feature"]
+    )
 
 
 # ── 集計 ────────────────────────────────────────────────────────────────────
@@ -424,30 +457,61 @@ def plot_feature_table(feature_pivot: pl.DataFrame, out_path: Path) -> None:
 # ── エントリーポイント ──────────────────────────────────────────────────────
 
 
+def _parse_args() -> argparse.Namespace:
+    """コマンドライン引数を解析する．
+
+    Returns:
+        `results_dir`・`out_dir` を持つ引数オブジェクト．
+    """
+    parser = argparse.ArgumentParser(
+        description="ベンチマーク計測結果を集計し，比較グラフとCSVを出力する．"
+    )
+    parser.add_argument(
+        "--results-dir",
+        type=Path,
+        default=_DEFAULT_RESULTS_DIR,
+        help=(
+            "計測結果ディレクトリ（{results-dir}/{workload}/results/{storage}/"
+            f"op_results.csv・feature_results.csv を読む．デフォルト: {_DEFAULT_RESULTS_DIR}）"
+        ),
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=_OUTPUT_DIR,
+        help=f"集計CSV・グラフPNGの出力先ディレクトリ（デフォルト: {_OUTPUT_DIR}）",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
     """集計・グラフ生成のエントリーポイント．
 
-    results/trial1 の計測結果と results/features_recheck の機能検証結果を
-    読み込み，集計CSVとグラフPNGを docs/figures/ へ出力する．
+    `--results-dir`（デフォルト results/trial2）配下の計測結果・機能検証結果を
+    読み込み，集計CSVとグラフPNGを `--out-dir`（デフォルト docs/figures）へ出力する．
     """
-    _setup_japanese_font()
-    _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    args = _parse_args()
+    results_dir: Path = args.results_dir
+    out_dir: Path = args.out_dir
 
-    op_results = load_op_results()
+    _setup_japanese_font()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    op_results = load_op_results(results_dir)
     latency = summarize_latency(op_results)
     throughput = summarize_throughput(op_results)
-    latency.write_csv(_OUTPUT_DIR / "latency_summary.csv")
-    throughput.write_csv(_OUTPUT_DIR / "throughput_summary.csv")
+    latency.write_csv(out_dir / "latency_summary.csv")
+    throughput.write_csv(out_dir / "throughput_summary.csv")
 
-    feature_results = load_feature_results()
+    feature_results = load_feature_results(results_dir)
     feature_pivot = pivot_feature_table(feature_results)
-    feature_pivot.write_csv(_OUTPUT_DIR / "feature_summary.csv")
+    feature_pivot.write_csv(out_dir / "feature_summary.csv")
 
-    plot_latency_comparison(latency, _OUTPUT_DIR / "latency_comparison.png")
-    plot_throughput_comparison(throughput, _OUTPUT_DIR / "throughput_comparison.png")
-    plot_feature_table(feature_pivot, _OUTPUT_DIR / "feature_table.png")
+    plot_latency_comparison(latency, out_dir / "latency_comparison.png")
+    plot_throughput_comparison(throughput, out_dir / "throughput_comparison.png")
+    plot_feature_table(feature_pivot, out_dir / "feature_table.png")
 
-    print(f"分析結果を {_OUTPUT_DIR} に出力しました．")
+    print(f"分析結果を {out_dir} に出力しました．")
 
 
 if __name__ == "__main__":
