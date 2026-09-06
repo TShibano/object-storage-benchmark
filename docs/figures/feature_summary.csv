@@ -1,0 +1,5 @@
+feature,minio,seaweedfs,garage
+HEAD,true,true,true
+TAGGING,true,true,false
+BUCKET_POLICY,true,true,false
+ACL,false,false,false
