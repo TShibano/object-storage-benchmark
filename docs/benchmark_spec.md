@@ -217,8 +217,8 @@ validate_acl()           -> FeatureResult
 
 | ストレージ | URL |
 | --------- | --- |
-| MinIO | `http://localhost:9001` |
-| SeaweedFS | `http://localhost:9333` (Filer: `http://localhost:8888`) |
+| MinIO | `http://localhost:9001`（OSS版は2025年5月以降オブジェクトブラウザのみ．ポリシー・設定・メトリクス等の管理機能はコンソールから削除され `mc` CLIへ移行） |
+| SeaweedFS | 管理UI: `http://localhost:23646`（`weed admin`．`weed server` に含まれない別プロセスのため `./scripts/start_seaweedfs_admin.sh` で起動する）．Master: `http://localhost:9333`，Filer: `http://localhost:8888` |
 | Garage | 管理コンソールなし（`http://localhost:3900` はS3 APIのエンドポイントであり管理画面ではない）．管理はCLIとAdmin API `http://localhost:3903` で行う |
 
 #### 検証項目

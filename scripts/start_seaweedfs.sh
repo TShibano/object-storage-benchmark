@@ -19,6 +19,7 @@ podman run -d \
     -p 8081:8080 \
     -p 8888:8888 \
     -p 8333:8333 \
+    -p 23646:23646 \
     chrislusf/seaweedfs:4.45 server \
     -s3 \
     -s3.port=8333 \
@@ -46,6 +47,8 @@ until curl -s -o /dev/null "http://localhost:8333"; do
 done
 
 echo "SeaweedFS 準備完了"
+echo "  ※ 管理UIは同梱の weed server に含まれないため別プロセス．"
+echo "    目視検証時は ./scripts/start_seaweedfs_admin.sh を実行する"
 echo "  Master: http://localhost:9333"
 echo "  S3:     http://localhost:8333"
 echo "  Filer:  http://localhost:8888"

@@ -69,7 +69,13 @@ OSS版MinIOは，2025年10月にDockerイメージの配布が終了され，そ
 | 使いやすさ | 操作感・情報密度の主観評価（3段階） | 良い / 普通 / 悪い |
 
 検証手順は各ストレージを個別に起動し，`./scripts/seed_ui_data.sh {minio|seaweedfs|garage}` で
-サンプルオブジェクトを投入してから確認する．Garageは公式の管理コンソールを同梱していない．
+サンプルオブジェクトを投入してから確認する．管理UIの提供形態は3者で大きく異なる．
+
+| ストレージ | 管理UI | 備考 |
+| ---------- | ------ | ---- |
+| MinIO | `http://localhost:9001` | OSS版は2025年5月以降オブジェクトブラウザのみ．管理機能は `mc` CLIへ移行 |
+| SeaweedFS | `http://localhost:23646` | `weed admin` は別プロセス．`./scripts/start_seaweedfs_admin.sh` で起動する |
+| Garage | なし | 公式コンソールを同梱しない．管理はCLIとAdmin API (`:3903`) |
 
 ### 結果出力
 

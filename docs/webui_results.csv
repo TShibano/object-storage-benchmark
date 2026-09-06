@@ -1,25 +1,25 @@
 storage,item,criteria,scale,result,note
-MinIO,アクセス可否,UIにアクセスできるか（ログイン画面またはダッシュボードが表示される）,Pass / Fail,,
-MinIO,バケット一覧,作成済みバケットが一覧表示されるか,Pass / Fail,,
-MinIO,オブジェクト閲覧,バケット内のオブジェクト（キー・サイズ）が一覧表示されるか,Pass / Fail,,
-MinIO,アップロード,UIからファイルをアップロードできるか,Pass / Fail,,
-MinIO,ダウンロード,UIからファイルをダウンロードできるか,Pass / Fail,,
-MinIO,バケットポリシー設定,UIからバケットポリシーを設定・参照できるか,Pass / Fail / N/A,,
-MinIO,メトリクス,スループット・リクエスト数などの監視情報が表示されるか,Pass / Fail / N/A,,
-MinIO,使いやすさ,操作感・情報密度の主観評価（3段階）,良い / 普通 / 悪い,,
-SeaweedFS,アクセス可否,UIにアクセスできるか（ログイン画面またはダッシュボードが表示される）,Pass / Fail,,
-SeaweedFS,バケット一覧,作成済みバケットが一覧表示されるか,Pass / Fail,,
-SeaweedFS,オブジェクト閲覧,バケット内のオブジェクト（キー・サイズ）が一覧表示されるか,Pass / Fail,,
-SeaweedFS,アップロード,UIからファイルをアップロードできるか,Pass / Fail,,
-SeaweedFS,ダウンロード,UIからファイルをダウンロードできるか,Pass / Fail,,
-SeaweedFS,バケットポリシー設定,UIからバケットポリシーを設定・参照できるか,Pass / Fail / N/A,,
-SeaweedFS,メトリクス,スループット・リクエスト数などの監視情報が表示されるか,Pass / Fail / N/A,,
-SeaweedFS,使いやすさ,操作感・情報密度の主観評価（3段階）,良い / 普通 / 悪い,,
-Garage,アクセス可否,UIにアクセスできるか（ログイン画面またはダッシュボードが表示される）,Pass / Fail,,公式の管理コンソールは同梱されない．管理はCLIとAdmin API(3903)
-Garage,バケット一覧,作成済みバケットが一覧表示されるか,Pass / Fail,,同上
-Garage,オブジェクト閲覧,バケット内のオブジェクト（キー・サイズ）が一覧表示されるか,Pass / Fail,,同上
-Garage,アップロード,UIからファイルをアップロードできるか,Pass / Fail,,同上
-Garage,ダウンロード,UIからファイルをダウンロードできるか,Pass / Fail,,同上
-Garage,バケットポリシー設定,UIからバケットポリシーを設定・参照できるか,Pass / Fail / N/A,,同上
-Garage,メトリクス,スループット・リクエスト数などの監視情報が表示されるか,Pass / Fail / N/A,,Admin APIで /metrics を公開
-Garage,使いやすさ,操作感・情報密度の主観評価（3段階）,良い / 普通 / 悪い,,同上
+MinIO,アクセス可否,UIにアクセスできるか（ログイン画面またはダッシュボードが表示される）,Pass / Fail, Pass,,
+MinIO,バケット一覧,作成済みバケットが一覧表示されるか,Pass / Fail,Pass,,
+MinIO,オブジェクト閲覧,バケット内のオブジェクト（キー・サイズ）が一覧表示されるか,Pass / Fail,Pass,,
+MinIO,アップロード,UIからファイルをアップロードできるか,Pass / Fail,Pass,,
+MinIO,ダウンロード,UIからファイルをダウンロードできるか,Pass / Fail,Pass,,
+MinIO,バケットポリシー設定,UIからバケットポリシーを設定・参照できるか,Pass / Fail / N/A,?,,
+MinIO,メトリクス,スループット・リクエスト数などの監視情報が表示されるか,Pass / Fail / N/A,?,,
+MinIO,使いやすさ,操作感・情報密度の主観評価（3段階）,良い / 普通 / 悪い,良い,モダンな見た目
+SeaweedFS,アクセス可否,UIにアクセスできるか（ログイン画面またはダッシュボードが表示される）,Pass / Fail,Pass,,
+SeaweedFS,バケット一覧,作成済みバケットが一覧表示されるか,Pass / Fail,Pass,,
+SeaweedFS,オブジェクト閲覧,バケット内のオブジェクト（キー・サイズ）が一覧表示されるか,Pass / Fail,Pass,,
+SeaweedFS,アップロード,UIからファイルをアップロードできるか,Pass / Fail,Pass,,
+SeaweedFS,ダウンロード,UIからファイルをダウンロードできるか,Pass / Fail,Pass,,
+SeaweedFS,バケットポリシー設定,UIからバケットポリシーを設定・参照できるか,Pass / Fail / N/A,?,,
+SeaweedFS,メトリクス,スループット・リクエスト数などの監視情報が表示されるか,Pass / Fail / N/A,?,,
+SeaweedFS,使いやすさ,操作感・情報密度の主観評価（3段階）,良い / 普通 / 悪い,普通,シンプルな見た目,,
+Garage,アクセス可否,UIにアクセスできるか（ログイン画面またはダッシュボードが表示される）,Pass / Fail,---,公式の管理コンソールは同梱されない．管理はCLIとAdmin API(3903)
+Garage,バケット一覧,作成済みバケットが一覧表示されるか,Pass / Fail,---,同上
+Garage,オブジェクト閲覧,バケット内のオブジェクト（キー・サイズ）が一覧表示されるか,Pass / Fail,---,同上
+Garage,アップロード,UIからファイルをアップロードできるか,Pass / Fail,---,同上
+Garage,ダウンロード,UIからファイルをダウンロードできるか,Pass / Fail,---,同上
+Garage,バケットポリシー設定,UIからバケットポリシーを設定・参照できるか,Pass / Fail / N/A,---,同上
+Garage,メトリクス,スループット・リクエスト数などの監視情報が表示されるか,Pass / Fail / N/A,---,Admin APIで /metrics を公開
+Garage,使いやすさ,操作感・情報密度の主観評価（3段階）,良い / 普通 / 悪い,---,同上
