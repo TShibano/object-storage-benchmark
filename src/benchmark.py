@@ -497,6 +497,7 @@ def main() -> None:
     """ベンチマークのエントリーポイント．
 
     --storage で指定したバックエンドについて，小ファイル・大ファイル両ワークロードを計測する．
+    --workload でワークロードを絞り込める．
     --features-only 指定時は計測（run_operation_measurement）を行わず，
     機能検証（run_feature_validation）のみを --out-dir 配下に出力する．
     """
@@ -517,6 +518,15 @@ def main() -> None:
         help="結果の出力先ディレクトリ (デフォルト: ./trial1)",
     )
     parser.add_argument(
+        "--workload",
+        choices=["small", "large", "all"],
+        default="all",
+        help=(
+            "計測するワークロード (デフォルト: all)．"
+            "ストレージの使用容量を抑えたい場合にワークロード毎の実行へ分割できる"
+        ),
+    )
+    parser.add_argument(
         "--features-only",
         action="store_true",
         help=(
@@ -531,6 +541,10 @@ def main() -> None:
         WorkloadConfig(name="small", file_mb=1, n_file=1_000, n_trial=10),
         WorkloadConfig(name="large", file_mb=100, n_file=10, n_trial=10),
     ]
+    if args.workload != "all":
+        workload_configs = [
+            wl for wl in workload_configs if wl.name == args.workload
+        ]
 
     if args.features_only:
         # 機能検証はワークロードのデータに依存しないため，ローカルデータの生成や
