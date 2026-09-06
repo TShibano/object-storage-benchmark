@@ -21,7 +21,7 @@ podman run -d \
     -p 3901:3901 \
     -p 3903:3903 \
     -v "$SCRIPT_DIR/garage.toml:/etc/garage.toml:ro" \
-    dxflrs/garage:v1.0.1
+    dxflrs/garage:v2.3.0
 
 echo "Garage 起動待機中..."
 until podman exec "$CONTAINER_NAME" /garage status > /dev/null 2>&1; do

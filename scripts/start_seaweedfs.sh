@@ -19,7 +19,7 @@ podman run -d \
     -p 8080:8080 \
     -p 8888:8888 \
     -p 8333:8333 \
-    chrislusf/seaweedfs server \
+    chrislusf/seaweedfs:4.45 server \
     -s3 \
     -s3.port=8333 \
     -filer \
