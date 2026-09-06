@@ -219,7 +219,7 @@ validate_acl()           -> FeatureResult
 | --------- | --- |
 | MinIO | `http://localhost:9001` |
 | SeaweedFS | `http://localhost:9333` (Filer: `http://localhost:8888`) |
-| Garage | `http://localhost:3900` |
+| Garage | 管理コンソールなし（`http://localhost:3900` はS3 APIのエンドポイントであり管理画面ではない）．管理はCLIとAdmin API `http://localhost:3903` で行う |
 
 #### 検証項目
 
@@ -236,10 +236,13 @@ validate_acl()           -> FeatureResult
 
 #### 記録フォーマット（`webui_results.csv`）
 
+記入者が仕様書を参照しなくても判断できるよう，確認内容（`criteria`）と評価尺度（`scale`）を
+CSVの列として持たせている．記入するのは `result` と `note` の2列．
+
 ```
-storage, item, result, note
-MinIO, アクセス可否, Pass, ""
-MinIO, バケット一覧, Pass, ""
+storage,item,criteria,scale,result,note
+MinIO,アクセス可否,UIにアクセスできるか（ログイン画面またはダッシュボードが表示される）,Pass / Fail,Pass,
+MinIO,バケット一覧,作成済みバケットが一覧表示されるか,Pass / Fail,Pass,
 ...
 ```
 
