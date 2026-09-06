@@ -25,7 +25,7 @@ S3互換オブジェクトストレージ（MinIO・SeaweedFS・Garage）のベ�
 | ワークロード | ファイル形式 | サイズ | 個数 | 操作 |
 | :----------: | :----------: | :----: | :--: | ---- |
 | 小ファイル | Parquet | 1 MB | 1,000 | PUT / GET / DELETE |
-| 大ファイル | Parquet | 100 MB | 5 | PUT / GET / DELETE |
+| 大ファイル | Parquet | 100 MB | 10 | PUT / GET / DELETE |
 
 ## 計測指標
 
