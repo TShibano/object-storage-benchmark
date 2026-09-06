@@ -458,6 +458,7 @@ def benchmark_storage(
     storage_config: StorageConfig,
     data_dir: Path,
     results_dir: Path,
+    features_only: bool = False,
 ) -> None:
     """単一ストレージバックエンドに対してベンチマークを実行する．
 
@@ -468,14 +469,18 @@ def benchmark_storage(
         storage_config: 対象ストレージの接続設定．
         data_dir: テスト用Parquetファイルが格納されたディレクトリ．
         results_dir: 結果CSVの出力先ディレクトリ．
+        features_only: True の場合 run_operation_measurement をスキップし，
+            run_feature_validation のみ実行する（機能検証のみの再検証用）．
     """
     client = create_client(storage_config)
     bucket = storage_config.bucket
     setup_bucket(client, bucket)
     try:
-        op_results = run_operation_measurement(
-            client, bucket, workload_config, storage_config.name, data_dir
-        )
+        op_results: list[OperationResult] = []
+        if not features_only:
+            op_results = run_operation_measurement(
+                client, bucket, workload_config, storage_config.name, data_dir
+            )
         feat_results = run_feature_validation(client, bucket, storage_config.name)
         save_results(op_results, feat_results, results_dir / storage_config.name)
     finally:
@@ -496,6 +501,8 @@ def main() -> None:
     """ベンチマークのエントリーポイント．
 
     --storage で指定したバックエンドについて，小ファイル・大ファイル両ワークロードを計測する．
+    --features-only 指定時は計測（run_operation_measurement）を行わず，
+    機能検証（run_feature_validation）のみを --out-dir 配下に出力する．
     """
     print("Start Benchmark")
     parser = argparse.ArgumentParser(
@@ -513,6 +520,14 @@ def main() -> None:
         default=Path("./results/trial1"),
         help="結果の出力先ディレクトリ (デフォルト: ./trial1)",
     )
+    parser.add_argument(
+        "--features-only",
+        action="store_true",
+        help=(
+            "機能検証のみを実行する（PUT/GET/DELETEの計測は行わない）．"
+            "既存の計測結果と混ざらないよう --out-dir 配下に feature_results.csv 等を出力する"
+        ),
+    )
     args = parser.parse_args()
 
     storage_config = _ALL_STORAGE_CONFIGS[args.storage]()
@@ -520,6 +535,20 @@ def main() -> None:
         WorkloadConfig(name="small", file_mb=1, n_file=1_000, n_trial=10),
         WorkloadConfig(name="large", file_mb=100, n_file=10, n_trial=10),
     ]
+
+    if args.features_only:
+        # 機能検証はワークロードのデータに依存しないため，ローカルデータの生成や
+        # ワークロード毎のループは不要．1回だけ実行し，既存結果と別のディレクトリへ出力する
+        print("機能検証のみ実行します（--features-only）")
+        benchmark_storage(
+            workload_configs[0],
+            storage_config,
+            data_dir=Path("."),  # features_only=True のため未使用
+            results_dir=args.out_dir,
+            features_only=True,
+        )
+        return
+
     print(f"ベンチマーク設定: {workload_configs}")
 
     for wl in workload_configs:
