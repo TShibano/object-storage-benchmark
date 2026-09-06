@@ -177,26 +177,30 @@ def measure_delete(
     workload: str,
     trial: int,
 ) -> OperationResult:
-    """DELETEオペレーションのレイテンシとスループットを計測する．
+    """DELETEオペレーションのレイテンシを計測する．
+
+    DELETEはボディ転送を伴わないため，スループット (MB/s) という指標自体が
+    意味を持たない（`size_bytes / elapsed` を計算すると数万MB/s等の無意味な値になる）．
+    そのためDELETEはレイテンシのみを指標とし，`throughput_mbps` は None を返す．
+    `size_bytes` はCSV記録用（他オペレーションとの列統一・集計時の参照用）に残す．
 
     Args:
         client: S3クライアント．
         bucket: バケット名．
         key: オブジェクトキー．
-        size_bytes: オブジェクトサイズ (bytes)．スループット算出に使用．
+        size_bytes: オブジェクトサイズ (bytes)．CSV記録用．スループット算出には使用しない．
         storage: バックエンド識別子．
         workload: ワークロード識別子．
         trial: 試行番号．
 
     Returns:
-        計測結果．
+        計測結果．`throughput_mbps` は常に None．
     """
     start = time.perf_counter()
     client.delete_object(Bucket=bucket, Key=key)
     elapsed_ms = (time.perf_counter() - start) * 1000
-    throughput_mbps = (size_bytes / 1024 / 1024) / (elapsed_ms / 1000)
     return OperationResult(
-        storage, "DELETE", workload, trial, key, size_bytes, elapsed_ms, throughput_mbps
+        storage, "DELETE", workload, trial, key, size_bytes, elapsed_ms, None
     )
 
 
@@ -269,7 +273,11 @@ def validate_head(
 ) -> FeatureResult:
     """HEADオペレーションの動作を検証する．
 
-    ContentLength と ContentType が正しく返ることを確認する．
+    仕様（docs/benchmark_spec.md）上の成功条件は「ClientErrorが発生せず，
+    ContentLengthがPUT時のサイズと一致する」のみ．ContentTypeの有無は
+    バックエンドによって省略されうる参考情報のため，判定条件には含めない
+    （以前はContentTypeの存在を条件に含めていたため，Garageのように
+    ContentTypeを返さない実装で例外なく false と誤記録されていた）．
 
     Args:
         client: S3クライアント．
@@ -283,10 +291,7 @@ def validate_head(
     """
     try:
         resp = client.head_object(Bucket=bucket, Key=key)
-        ok = (
-            resp.get("ContentLength") == expected_size
-            and resp.get("ContentType") is not None
-        )
+        ok = resp.get("ContentLength") == expected_size
         return FeatureResult(storage, "HEAD", ok, None)
     except Exception as e:
         return FeatureResult(storage, "HEAD", False, str(e))

@@ -57,7 +57,7 @@ class OperationResult:
         key: オブジェクトキー．
         size_bytes: オブジェクトサイズ (bytes)．
         elapsed_ms: 所要時間 (ms)．
-        throughput_mbps: スループット (MB/s)．
+        throughput_mbps: スループット (MB/s)．DELETEはボディ転送がないため None．
     """
 
     storage: str
@@ -67,7 +67,7 @@ class OperationResult:
     key: str
     size_bytes: int
     elapsed_ms: float
-    throughput_mbps: float
+    throughput_mbps: float | None
 
 
 @dataclass
