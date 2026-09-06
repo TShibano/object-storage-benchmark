@@ -16,7 +16,7 @@ fi
 podman run -d \
     --name "$CONTAINER_NAME" \
     -p 9333:9333 \
-    -p 8080:8080 \
+    -p 8081:8080 \
     -p 8888:8888 \
     -p 8333:8333 \
     chrislusf/seaweedfs:4.45 server \
@@ -24,10 +24,24 @@ podman run -d \
     -s3.port=8333 \
     -filer \
     -filer.port=8888 \
-    -master.volumeSizeLimitMB=500
+    -master.volumeSizeLimitMB=500 \
+    -volume.max=60
 
 echo "SeaweedFS 起動待機中..."
 until curl -sf "http://localhost:9333/cluster/status" > /dev/null 2>&1; do
+    sleep 1
+done
+
+# masterが応答してもボリュームサーバの登録前はPUTがInternalErrorになるため，
+# 実際に書き込み先を割り当てられる状態まで待つ
+echo "ボリューム準備待機中..."
+until curl -s "http://localhost:9333/dir/assign" | grep -q '"fid"'; do
+    sleep 1
+done
+
+# S3 APIはmasterより遅れて起動するため個別に待つ
+echo "S3 API待機中..."
+until curl -s -o /dev/null "http://localhost:8333"; do
     sleep 1
 done
 
