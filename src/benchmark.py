@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import io
 import json
-import sys
 import time
 from pathlib import Path
 
@@ -76,13 +75,14 @@ def setup_bucket(client: S3Client, bucket: str) -> None:
 
 
 def teardown_bucket(client: S3Client, bucket: str) -> None:
-    """バケット内の全オブジェクトを削除し，バケットの削除を試みる．
+    """バケット内の全オブジェクトを削除する．
 
-    オブジェクト削除（次バックエンドのための容量解放）を主目的とし，
-    空バケットの削除は後片付けとして扱う．Garageは事前作成したバケットを
-    S3 DeleteBucket で削除できない（グローバルエイリアス仕様）ため，
-    delete_bucket の失敗は警告のみで無視する．finally から呼ばれても
-    計測フェーズの例外を隠さないようにする狙いもある．
+    次バックエンドのための容量解放が目的であり，バケット自体は残す．
+    バケットの生成・削除は計測対象のオペレーションではないうえ，
+    Garage v2系ではS3 DeleteBucketが実際に成功してしまい，事前に
+    garage CLIで用意したバケットが消える．その後のワークロードで
+    再作成しようとしても鍵にバケット作成権限がなく失敗するため，
+    バックエンドによらずバケットを残す方針とする．
 
     Args:
         client: S3クライアント．
@@ -93,10 +93,6 @@ def teardown_bucket(client: S3Client, bucket: str) -> None:
         objects = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
         if objects:
             client.delete_objects(Bucket=bucket, Delete={"Objects": objects})
-    try:
-        client.delete_bucket(Bucket=bucket)
-    except botocore.exceptions.ClientError as e:
-        print(f"警告: バケット '{bucket}' の削除をスキップしました: {e}", file=sys.stderr)
 
 
 # ── 単一オペレーション計測 ──────────────────────────────────────────────────
