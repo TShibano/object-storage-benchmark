@@ -12,7 +12,7 @@ ENV_FILE="$SCRIPT_DIR/.garage_env"
 
 if podman container exists "$CONTAINER_NAME" 2>/dev/null; then
     echo "既存コンテナ '$CONTAINER_NAME' を削除します"
-    podman rm -f "$CONTAINER_NAME"
+    podman rm -f -v "$CONTAINER_NAME"
 fi
 
 podman run -d \
