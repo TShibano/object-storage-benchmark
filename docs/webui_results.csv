@@ -1,0 +1,25 @@
+storage,item,result,note
+MinIO,アクセス可否,,
+MinIO,バケット一覧,,
+MinIO,オブジェクト閲覧,,
+MinIO,アップロード,,
+MinIO,ダウンロード,,
+MinIO,バケットポリシー設定,,
+MinIO,メトリクス,,
+MinIO,使いやすさ,,
+SeaweedFS,アクセス可否,,
+SeaweedFS,バケット一覧,,
+SeaweedFS,オブジェクト閲覧,,
+SeaweedFS,アップロード,,
+SeaweedFS,ダウンロード,,
+SeaweedFS,バケットポリシー設定,,
+SeaweedFS,メトリクス,,
+SeaweedFS,使いやすさ,,
+Garage,アクセス可否,,公式の管理コンソールは同梱されない．管理はCLIとAdmin API(3903)
+Garage,バケット一覧,,同上
+Garage,オブジェクト閲覧,,同上
+Garage,アップロード,,同上
+Garage,ダウンロード,,同上
+Garage,バケットポリシー設定,,同上
+Garage,メトリクス,,Admin APIで /metrics を公開
+Garage,使いやすさ,,同上
