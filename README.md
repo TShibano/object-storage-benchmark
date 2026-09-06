@@ -1,6 +1,8 @@
 # object-storage-benchmark
 
 S3互換性オブジェクトストレージのベンチマークを行う．
+現在行った検証では，MinIOをリファレンスとして，GarageとSeaweedFSを比較した．
+その結果，S3互換性および，読み書き等のパフォーマンス，WebUIの使い勝手から，SeaweedFSに軍配が上がった．
 
 ## 目的
 
